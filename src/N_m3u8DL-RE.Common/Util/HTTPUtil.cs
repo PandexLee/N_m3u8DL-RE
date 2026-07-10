@@ -80,8 +80,16 @@ public static class HTTPUtil
             return await File.ReadAllBytesAsync(new Uri(url).LocalPath);
         }
 
-        var webResponse = await DoGetAsync(url, headers);
-        var bytes = await webResponse.Content.ReadAsByteArrayAsync();
+        byte[] bytes;
+        try
+        {
+            var webResponse = await DoGetAsync(url, headers);
+            bytes = await webResponse.Content.ReadAsByteArrayAsync();
+        }
+        catch (HttpRequestException) when (CurlUtil.ShouldUseCurlFallback(url))
+        {
+            bytes = await CurlUtil.GetBytesAsync(url, headers);
+        }
         Logger.Debug(HexUtil.BytesToHex(bytes, " "));
         return bytes;
     }
@@ -94,8 +102,17 @@ public static class HTTPUtil
     /// <returns></returns>
     public static async Task<string> GetWebSourceAsync(string url, Dictionary<string, string>? headers = null)
     {
-        var webResponse = await DoGetAsync(url, headers);
-        string htmlCode = await webResponse.Content.ReadAsStringAsync();
+        string htmlCode;
+        try
+        {
+            var webResponse = await DoGetAsync(url, headers);
+            htmlCode = await webResponse.Content.ReadAsStringAsync();
+        }
+        catch (HttpRequestException) when (CurlUtil.ShouldUseCurlFallback(url))
+        {
+            var bytes = await CurlUtil.GetBytesAsync(url, headers);
+            htmlCode = Encoding.UTF8.GetString(bytes);
+        }
         Logger.Debug(htmlCode);
         return htmlCode;
     }
@@ -108,7 +125,18 @@ public static class HTTPUtil
     /// <returns>(Source Code, RedirectedUrl)</returns>
     public static async Task<(string, string)> GetWebSourceAndNewUrlAsync(string url, Dictionary<string, string>? headers = null)
     {
-        var webResponse = await DoGetAsync(url, headers);
+        HttpResponseMessage webResponse;
+        try
+        {
+            webResponse = await DoGetAsync(url, headers);
+        }
+        catch (HttpRequestException) when (CurlUtil.ShouldUseCurlFallback(url))
+        {
+            var bytes = await CurlUtil.GetBytesAsync(url, headers);
+            var htmlCodeFromCurl = Encoding.UTF8.GetString(bytes);
+            Logger.Debug(htmlCodeFromCurl);
+            return (htmlCodeFromCurl, url);
+        }
         var htmlCode = "";
 
         // 如果响应是压缩的（gzip/deflate/br），直接按文本处理

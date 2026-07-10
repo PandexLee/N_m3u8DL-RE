@@ -134,6 +134,22 @@ internal static class DownloadUtil
                 GzipHeader = gZipHeader
             };
         }
+        catch (HttpRequestException) when (CurlUtil.ShouldUseCurlFallback(url))
+        {
+            await CurlUtil.DownloadToFileAsync(url, path, headers, fromPosition, toPosition, cancellationTokenSource.Token);
+            var bytes = await File.ReadAllBytesAsync(path, cancellationTokenSource.Token);
+            var imageHeader = ImageHeaderUtil.IsImageHeader(bytes);
+            var gZipHeader = bytes.Length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
+            speedContainer.Add(bytes.Length);
+            return new DownloadResult()
+            {
+                ActualContentLength = bytes.Length,
+                RespContentLength = bytes.Length,
+                ActualFilePath = path,
+                ImageHeader = imageHeader,
+                GzipHeader = gZipHeader
+            };
+        }
         catch (OperationCanceledException oce) when (oce.CancellationToken == cancellationTokenSource.Token)
         {
             speedContainer.ResetLowSpeedCount();
