@@ -33,4 +33,35 @@ public class LegacyProtocolArgsTests
             ],
             normalized);
     }
+
+    [Fact]
+    public void NormalizeArgs_LegacyM3u8DlProtocol_DecodesQuotedUrlWithTrailingSlash()
+    {
+        const string url = "https://surrit.com/example/1080p/video.m3u8";
+        var protocolArg = "\"" + BuildProtocolArg($"\"{url}\" --saveName \"title\"") + "/\"";
+
+        var normalized = CommandInvoker.NormalizeArgs([protocolArg]);
+
+        Assert.Equal(url, normalized[0]);
+        Assert.Equal("--save-name", normalized[1]);
+        Assert.Equal("title", normalized[2]);
+    }
+
+    [Fact]
+    public void NormalizeArgs_LegacyM3u8DlProtocol_DecodesPayloadWithMissingPadding()
+    {
+        const string url = "https://surrit.com/example/1080p/video.m3u8";
+        var protocolArg = BuildProtocolArg($"\"{url}\" --saveName \"title\"").TrimEnd('=');
+
+        var normalized = CommandInvoker.NormalizeArgs([protocolArg]);
+
+        Assert.Equal(url, normalized[0]);
+        Assert.Equal("--save-name", normalized[1]);
+        Assert.Equal("title", normalized[2]);
+    }
+
+    private static string BuildProtocolArg(string legacyArgs)
+    {
+        return "m3u8dl://" + Convert.ToBase64String(Encoding.UTF8.GetBytes(legacyArgs));
+    }
 }
