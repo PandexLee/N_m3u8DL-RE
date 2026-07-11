@@ -4,7 +4,7 @@
 
 跨平台的DASH/HLS/MSS下载工具。支持点播、直播(DASH/HLS)。
 
-## PandexLee MissAV 兼容版
+## N_m3u8DL-RE MissAV 兼容版
 
 这是基于原版 [nilaoda/N_m3u8DL-RE](https://github.com/nilaoda/N_m3u8DL-RE) 修改的 MissAV 专用兼容构建，主要用于配合 GreasyFork 脚本 [Jable一键下载收藏（支持 MissAV）](https://greasyfork.org/zh-CN/scripts/474848-jable%E4%B8%80%E9%94%AE%E4%B8%8B%E8%BD%BD%E6%94%B6%E8%97%8F-%E6%94%AF%E6%8C%81missav)，让浏览器里的“下载”按钮可以继续唤起本地下载器下载 MissAV 的 `surrit.com` 视频流。
 
