@@ -4,6 +4,39 @@
 
 跨平台的DASH/HLS/MSS下载工具。支持点播、直播(DASH/HLS)。
 
+## PandexLee MissAV 兼容版
+
+这是基于原版 [nilaoda/N_m3u8DL-RE](https://github.com/nilaoda/N_m3u8DL-RE) 修改的 MissAV 专用兼容构建，主要用于配合 GreasyFork 脚本 [Jable一键下载收藏（支持 MissAV）](https://greasyfork.org/zh-CN/scripts/474848-jable%E4%B8%80%E9%94%AE%E4%B8%8B%E8%BD%BD%E6%94%B6%E8%97%8F-%E6%94%AF%E6%8C%81missav)，让浏览器里的“下载”按钮可以继续唤起本地下载器下载 MissAV 的 `surrit.com` 视频流。
+
+如果你不是为了下载 MissAV，建议优先使用上游原版；这个 fork 的主要价值是修复 MissAV/surrit 链路在旧下载器和原版 RE 中遇到的兼容问题。
+
+### 我改了什么
+
+- 修复 MissAV/surrit 链接在旧版 `N_m3u8DL-CLI v3.0.2` 或原版 RE 中常见的 `地址无效`、M3U8/分片 `403` 问题。
+- 增强 `surrit.com` 拉流兼容性，支持配合用户脚本传入 `Referer`、`User-Agent` 等请求头。
+- 支持通过 `m3u8dl://` 外部协议从浏览器一键唤起下载器。
+- 兼容旧脚本生成的 Base64 协议参数，包括 Windows/Chrome 可能把 `m3u8dl://...=` 规范化成 `m3u8dl://...=/` 的情况。
+- 兼容部分旧 `N_m3u8DL-CLI` 参数名，减少老用户从 CLI 迁移到 RE 时需要改配置的地方。
+- 新增 `--registerUrlProtocol` 参数，可直接注册 Windows 的 `m3u8dl://` 协议。
+
+### 老用户怎么升级
+
+如果你只是为了使用 GreasyFork 脚本下载 MissAV，下载这个兼容版并重新注册协议即可：
+
+[下载 N_m3u8DL-RE_v0.6.0-missav.4_win-x64.zip](https://github.com/PandexLee/N_m3u8DL-RE/releases/download/v0.6.0-missav.4/N_m3u8DL-RE_v0.6.0-missav.4_win-x64.zip)
+
+解压后在 PowerShell 中执行一次协议注册：
+
+```powershell
+.\N_m3u8DL-RE.exe --registerUrlProtocol
+```
+
+然后把 GreasyFork 脚本更新到 `2.3.7` 或更新版本即可。若浏览器点击下载后窗口里仍显示 `N_m3u8DL-CLI version 3.0.2`，说明系统协议还绑在旧下载器上，需要重新执行上面的注册命令。
+
+### 和原版的关系
+
+这是面向 MissAV/surrit 下载场景的临时兼容 fork，不替代原版通用下载器。通用功能、参数说明和上游更新仍以原项目为准；本 README 下方保留的是原版 N_m3u8DL-RE 的主要说明。
+
 [![img](https://img.shields.io/github/stars/nilaoda/N_m3u8DL-RE?label=%E7%82%B9%E8%B5%9E)](https://github.com/nilaoda/N_m3u8DL-RE)  [![img](https://img.shields.io/github/last-commit/nilaoda/N_m3u8DL-RE?label=%E6%9C%80%E8%BF%91%E6%8F%90%E4%BA%A4)](https://github.com/nilaoda/N_m3u8DL-RE)  [![img](https://img.shields.io/github/release/nilaoda/N_m3u8DL-RE?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/nilaoda/N_m3u8DL-RE/releases)  [![img](https://img.shields.io/github/license/nilaoda/N_m3u8DL-RE?label=%E8%AE%B8%E5%8F%AF%E8%AF%81)](https://github.com/nilaoda/N_m3u8DL-RE)   [![img](https://img.shields.io/github/downloads/nilaoda/N_m3u8DL-RE/total?label=%E4%B8%8B%E8%BD%BD%E9%87%8F)](https://github.com/nilaoda/N_m3u8DL-RE/releases)
 
 遇到 BUG 请首先确认软件是否为最新版本（如果是 Release 版本，建议到 [Actions](https://github.com/nilaoda/N_m3u8DL-RE/actions) 页面下载最新自动构建版本后查看问题是否已经被修复），如果确认版本最新且问题依旧存在，可以到 [Issues](https://github.com/nilaoda/N_m3u8DL-RE/issues) 中查找是否有人遇到过相关问题，没有的话再进行询问。
