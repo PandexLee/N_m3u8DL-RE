@@ -16,7 +16,7 @@ namespace N_m3u8DL_RE.CommandLine;
 
 internal static partial class CommandInvoker
 {
-    public const string VERSION_INFO = "N_m3u8DL-RE (Beta version) 20260628-missav.2";
+    public const string VERSION_INFO = "N_m3u8DL-RE (Beta version) 20260628-missav.3";
 
     [GeneratedRegex("((best|worst)\\d*|all)")]
     private static partial Regex ForStrRegex();
@@ -802,8 +802,15 @@ internal static partial class CommandInvoker
             return false;
 
         var payload = Uri.UnescapeDataString(arg[scheme.Length..]);
-        decodedCommandLine = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-        return true;
+        try
+        {
+            decodedCommandLine = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     private static IEnumerable<string> SplitLegacyCommandLine(string commandLine)

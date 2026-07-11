@@ -52,6 +52,9 @@ internal class Program
 
         CultureUtil.ChangeCurrentCultureName(loc);
 
+        if (UrlProtocolRegistrar.TryHandle(args))
+            return;
+
         await CommandInvoker.InvokeArgs(args, DoWorkAsync);
     }
 
