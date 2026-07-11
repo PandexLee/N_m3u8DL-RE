@@ -31,7 +31,8 @@ public static class CurlUtil
         Dictionary<string, string>? headers,
         long? fromPosition = null,
         long? toPosition = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<long>? onBytesRead = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -53,7 +54,7 @@ public static class CurlUtil
         args.Add("--show-error");
         args.Add("--compressed");
         args.Add("--output");
-        args.Add(path);
+        args.Add("-");
 
         if (fromPosition != null || toPosition != null)
         {
@@ -72,16 +73,45 @@ public static class CurlUtil
 
         args.Add(url);
 
-        process.Start();
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var stderr = await stderrTask;
-
-        if (process.ExitCode != 0)
+        try
         {
-            TryDelete(path);
-            throw new HttpRequestException($"curl fallback failed with exit code {process.ExitCode}: {stderr}".Trim());
+            process.Start();
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await CopyToFileAsync(process.StandardOutput.BaseStream, path, onBytesRead, cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            var stderr = await stderrTask;
+
+            if (process.ExitCode != 0)
+            {
+                TryDelete(path);
+                throw new HttpRequestException($"curl fallback failed with exit code {process.ExitCode}: {stderr}".Trim());
+            }
         }
+        catch
+        {
+            TryKill(process);
+            throw;
+        }
+    }
+
+    internal static async Task<long> CopyToFileAsync(
+        Stream input,
+        string path,
+        Action<long>? onBytesRead = null,
+        CancellationToken cancellationToken = default)
+    {
+        long written = 0;
+        await using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        var buffer = new byte[16 * 1024];
+        int size;
+        while ((size = await input.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            await output.WriteAsync(buffer.AsMemory(0, size), cancellationToken);
+            written += size;
+            onBytesRead?.Invoke(size);
+        }
+
+        return written;
     }
 
     internal static string FormatHeaderForCurl(string key, string value)
@@ -116,6 +146,19 @@ public static class CurlUtil
         catch
         {
             // Best-effort cleanup only.
+        }
+    }
+
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Best-effort process cleanup only.
         }
     }
 }

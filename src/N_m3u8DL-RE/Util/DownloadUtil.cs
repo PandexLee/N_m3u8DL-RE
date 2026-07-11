@@ -136,11 +136,10 @@ internal static class DownloadUtil
         }
         catch (HttpRequestException) when (CurlUtil.ShouldUseCurlFallback(url))
         {
-            await CurlUtil.DownloadToFileAsync(url, path, headers, fromPosition, toPosition, cancellationTokenSource.Token);
+            await CurlUtil.DownloadToFileAsync(url, path, headers, fromPosition, toPosition, cancellationTokenSource.Token, size => speedContainer.Add(size));
             var bytes = await File.ReadAllBytesAsync(path, cancellationTokenSource.Token);
             var imageHeader = ImageHeaderUtil.IsImageHeader(bytes);
             var gZipHeader = bytes.Length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
-            speedContainer.Add(bytes.Length);
             return new DownloadResult()
             {
                 ActualContentLength = bytes.Length,

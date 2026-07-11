@@ -9,13 +9,14 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace N_m3u8DL_RE.CommandLine;
 
 internal static partial class CommandInvoker
 {
-    public const string VERSION_INFO = "N_m3u8DL-RE (Beta version) 20260628-missav.1";
+    public const string VERSION_INFO = "N_m3u8DL-RE (Beta version) 20260628-missav.2";
 
     [GeneratedRegex("((best|worst)\\d*|all)")]
     private static partial Regex ForStrRegex();
@@ -75,6 +76,7 @@ internal static partial class CommandInvoker
 
     // 代理选项
     private static readonly Option<bool> UseSystemProxy = new Option<bool>("--use-system-proxy") { Description = ResString.cmd_useSystemProxy }.WithDefault(true);
+    private static readonly Option<bool> NoProxy = new Option<bool>("--noProxy") { Hidden = true }.WithDefault(false);
     private static readonly Option<WebProxy?> CustomProxy = new("--custom-proxy") { HelpName = "URL", Description = ResString.cmd_customProxy, CustomParser = ParseProxy};
 
     // 只下载部分分片
@@ -678,6 +680,9 @@ internal static partial class CommandInvoker
             MaxSpeed = result.GetValue(MaxSpeed),
         };
 
+        if (result.GetValue(NoProxy))
+            option.UseSystemProxy = false;
+
         if (result.HasOption(CustomHLSMethod)) option.CustomHLSMethod = result.GetValue(CustomHLSMethod);
         if (result.HasOption(CustomHLSKey)) option.CustomHLSKey = result.GetValue(CustomHLSKey);
         if (result.HasOption(CustomHLSIv)) option.CustomHLSIv = result.GetValue(CustomHLSIv);
@@ -708,6 +713,7 @@ internal static partial class CommandInvoker
 
     public static async Task<int> InvokeArgs(string[] args, Func<MyOption, Task> action)
     {
+        args = NormalizeArgs(args);
         var argList = new List<string>(args);
         var index = -1;
         if ((index = argList.IndexOf("--morehelp")) >= 0 && argList.Count > index + 1)
@@ -735,7 +741,7 @@ internal static partial class CommandInvoker
             LogLevel, UILanguage, UrlProcessorArgs, Keys, KeyTextFile, DecryptionEngine, DecryptionBinaryPath, UseShakaPackager, MP4RealTimeDecryption,
             MaxSpeed,
             MuxAfterDone,
-            CustomHLSMethod, CustomHLSKey, CustomHLSIv, UseSystemProxy, CustomProxy, CustomRange, TaskStartAt,
+            CustomHLSMethod, CustomHLSKey, CustomHLSIv, UseSystemProxy, NoProxy, CustomProxy, CustomRange, TaskStartAt,
             LivePerformAsVod, LiveRealTimeMerge, LiveKeepSegments, LivePipeMux, LiveFixVttByAudio, LiveRecordLimit, LiveWaitTime, LiveTakeCount,
             MuxImports, VideoFilter, AudioFilter, SubtitleFilter, DropVideoFilter, DropAudioFilter, DropSubtitleFilter, AdKeywords, DisableUpdateCheck, AllowHlsMultiExtMap, MoreHelp
         };
@@ -776,5 +782,127 @@ internal static partial class CommandInvoker
         }
 
         return 0;
+    }
+
+    internal static string[] NormalizeArgs(string[] args)
+    {
+        if (args.Length == 1 && TryDecodeLegacyProtocol(args[0], out var decodedCommandLine))
+        {
+            args = SplitLegacyCommandLine(decodedCommandLine).ToArray();
+        }
+
+        return MapLegacyCliArgs(args).ToArray();
+    }
+
+    private static bool TryDecodeLegacyProtocol(string arg, out string decodedCommandLine)
+    {
+        const string scheme = "m3u8dl://";
+        decodedCommandLine = "";
+        if (!arg.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var payload = Uri.UnescapeDataString(arg[scheme.Length..]);
+        decodedCommandLine = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+        return true;
+    }
+
+    private static IEnumerable<string> SplitLegacyCommandLine(string commandLine)
+    {
+        var token = new StringBuilder();
+        var inDoubleQuote = false;
+
+        foreach (var ch in commandLine)
+        {
+            if (ch == '"')
+            {
+                inDoubleQuote = !inDoubleQuote;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(ch) && !inDoubleQuote)
+            {
+                if (token.Length > 0)
+                {
+                    yield return token.ToString();
+                    token.Clear();
+                }
+                continue;
+            }
+
+            token.Append(ch);
+        }
+
+        if (token.Length > 0)
+            yield return token.ToString();
+    }
+
+    private static IEnumerable<string> MapLegacyCliArgs(string[] args)
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (EqualsLegacyOption(arg, "--saveName") && TryReadNext(args, ref i, out var saveName))
+            {
+                yield return "--save-name";
+                yield return saveName;
+            }
+            else if (EqualsLegacyOption(arg, "--workDir") && TryReadNext(args, ref i, out var saveDir))
+            {
+                yield return "--save-dir";
+                yield return saveDir;
+            }
+            else if (EqualsLegacyOption(arg, "--headers") && TryReadNext(args, ref i, out var headers))
+            {
+                foreach (var header in headers.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    yield return "-H";
+                    yield return header;
+                }
+            }
+            else if (EqualsLegacyOption(arg, "--maxThreads") && TryReadNext(args, ref i, out var maxThreads))
+            {
+                yield return "--thread-count";
+                yield return maxThreads;
+            }
+            else if (EqualsLegacyOption(arg, "--minThreads"))
+            {
+                _ = TryReadNext(args, ref i, out _);
+            }
+            else if (EqualsLegacyOption(arg, "--retryCount") && TryReadNext(args, ref i, out var retryCount))
+            {
+                yield return "--download-retry-count";
+                yield return retryCount;
+            }
+            else if (EqualsLegacyOption(arg, "--timeOut") && TryReadNext(args, ref i, out var timeout))
+            {
+                yield return "--http-request-timeout";
+                yield return timeout;
+            }
+            else if (EqualsLegacyOption(arg, "--enableDelAfterDone"))
+            {
+                yield return "--del-after-done";
+            }
+            else
+            {
+                yield return arg;
+            }
+        }
+    }
+
+    private static bool TryReadNext(string[] args, ref int index, out string value)
+    {
+        if (index + 1 >= args.Length)
+        {
+            value = "";
+            return false;
+        }
+
+        value = args[++index];
+        return true;
+    }
+
+    private static bool EqualsLegacyOption(string value, string option)
+    {
+        return string.Equals(value, option, StringComparison.OrdinalIgnoreCase);
     }
 }
